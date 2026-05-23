@@ -44,3 +44,27 @@ def validate_config() -> None:
         raise ValueError("BOT_TOKEN is not set. Add it to your .env file.")
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(WORKSPACE_PATH, exist_ok=True)
+
+
+# ─── Per-user path helpers ────────────────────────────────────
+def user_data_dir(user_id: int) -> str:
+    """data/users/<user_id>/ — rclone.conf, token.json per user"""
+    path = os.path.join(DATA_DIR, "users", str(user_id))
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def user_rclone_config(user_id: int) -> str:
+    return os.path.join(user_data_dir(user_id), "rclone.conf")
+
+def user_token_file(user_id: int) -> str:
+    return os.path.join(user_data_dir(user_id), "token.json")
+
+def user_workspace(user_id: int) -> str:
+    """downloads/<user_id>/ — isolated download workspace per user"""
+    path = os.path.join(WORKSPACE_PATH, str(user_id))
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def user_rclone_remote(user_id: int) -> str:
+    """Unique rclone remote name per user to avoid config conflicts"""
+    return f"{RCLONE_REMOTE_NAME}_{user_id}"

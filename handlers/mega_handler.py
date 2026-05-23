@@ -109,7 +109,7 @@ async def cb_cancel_transfer(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(lambda c: c.data == "menu:mega")
 async def cb_mega_menu(callback: CallbackQuery, state: FSMContext) -> None:
-    if not is_rclone_configured():
+    if not is_rclone_configured(callback.from_user.id):
         await callback.message.edit_text(
             "⚠️ *GDrive is not configured yet!*\n\n"
             "Please set your GDrive token first via 🔑 *Change GDrive Token*.",
@@ -159,12 +159,13 @@ async def handle_mega_link(message: Message, bot: Bot, state: FSMContext) -> Non
 async def _run_transfer(message: Message, bot: Bot, state: FSMContext, link: str) -> None:
     from handlers.start_handler import main_menu_keyboard
 
-    dest_dir = config.WORKSPACE_PATH
+    user_id  = message.from_user.id
+    dest_dir = config.user_workspace(user_id)
     chat_id  = message.chat.id
     start_time = time.time()
 
     # ── Pre-flight space check ─────────────────────────────────
-    free = get_workspace_free_bytes()
+    free = get_workspace_free_bytes(user_id)
     if free < 1 * 1024**3:
         await message.answer(
             f"⚠️ *Workspace low on space!*\nOnly `{human_size(free)}` left.\n"
@@ -315,7 +316,7 @@ async def _run_transfer(message: Message, bot: Bot, state: FSMContext, link: str
 
     # ── Upload via rclone ──────────────────────────────────────
     upload_result = await upload_with_rclone(
-        file_path, filename, bot, chat_id, msg_id, transfer_ctx
+        file_path, filename, bot, chat_id, msg_id, transfer_ctx, user_id
     )
 
     if not upload_result.success:

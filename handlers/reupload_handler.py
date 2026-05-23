@@ -61,8 +61,8 @@ def _file_pick_keyboard(entries) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def _get_entries():
-    return [e for e in list_workspace() if not e.name.endswith(".rclone.log")]
+def _get_entries(user_id: int):
+    return [e for e in list_workspace(user_id) if not e.name.endswith(".rclone.log")]
 
 
 # ─── Main menu entry ──────────────────────────────────────────
@@ -70,16 +70,17 @@ def _get_entries():
 @router.callback_query(lambda c: c.data == "menu:reupload_pick")
 async def cb_reupload_pick(callback: CallbackQuery, state: FSMContext) -> None:
     chat_id = callback.message.chat.id
+    uid = callback.from_user.id
     if chat_id in _active_transfers:
         await callback.answer("⚠️ Transfer already in progress. Cancel it first.", show_alert=True)
         return
 
     from utils.rclone_setup import is_rclone_configured
-    if not is_rclone_configured():
+    if not is_rclone_configured(uid):
         await callback.answer("❌ GDrive token not set. Please update it first.", show_alert=True)
         return
 
-    entries = _get_entries()
+    entries = _get_entries(uid)
     if not entries:
         await callback.message.edit_text(
             "⚠️ <b>Workspace is empty.</b> No files to reupload.",
@@ -100,16 +101,17 @@ async def cb_reupload_pick(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(lambda c: c.data and c.data.startswith("reupload:file:"))
 async def cb_reupload_file_pick(callback: CallbackQuery, bot: Bot, state: FSMContext) -> None:
     chat_id = callback.message.chat.id
+    uid = callback.from_user.id
     if chat_id in _active_transfers:
         await callback.answer("⚠️ Transfer already in progress.", show_alert=True)
         return
 
     index = int(callback.data.split(":")[-1])
-    entries = _get_entries()
+    entries = _get_entries(uid)
     match = next((e for e in entries if e.index == index), None)
 
     if not match or not os.path.exists(match.full_path):
-        entries = _get_entries()
+        entries = _get_entries(uid)
         if entries:
             await callback.message.edit_text(
                 "❌ <b>File no longer exists.</b> Select another:\n\n📂 <b>Select a file to reupload:</b>",
@@ -124,7 +126,7 @@ async def cb_reupload_file_pick(callback: CallbackQuery, bot: Bot, state: FSMCon
         return
 
     await callback.answer()
-    await _start_reupload(callback.message, bot, state, match.full_path, match.name, match.size_bytes)
+    await _start_reupload(callback.message, bot, state, match.full_path, match.name, match.size_bytes, uid)
 
 
 # ─── Workspace manager per-file entry ────────────────────────
@@ -132,26 +134,27 @@ async def cb_reupload_file_pick(callback: CallbackQuery, bot: Bot, state: FSMCon
 @router.callback_query(lambda c: c.data and c.data.startswith("ws:reupload:"))
 async def cb_ws_reupload(callback: CallbackQuery, bot: Bot, state: FSMContext) -> None:
     chat_id = callback.message.chat.id
+    uid = callback.from_user.id
     if chat_id in _active_transfers:
         await callback.answer("⚠️ A transfer is already in progress.", show_alert=True)
         return
 
     index = int(callback.data.split(":")[-1])
-    entries = _get_entries()
+    entries = _get_entries(uid)
     match = next((e for e in entries if e.index == index), None)
     if not match:
         await callback.answer("File not found.", show_alert=True)
         return
 
     await callback.answer()
-    await _start_reupload(callback.message, bot, state, match.full_path, match.name, match.size_bytes)
+    await _start_reupload(callback.message, bot, state, match.full_path, match.name, match.size_bytes, uid)
 
 
 # ─── Shared upload runner ─────────────────────────────────────
 
 async def _start_reupload(
     message: Message, bot: Bot, state: FSMContext,
-    file_path: str, filename: str, file_size: float,
+    file_path: str, filename: str, file_size: float, user_id: int,
 ) -> None:
     from handlers.start_handler import main_menu_keyboard
 
@@ -175,7 +178,7 @@ async def _start_reupload(
     }
     _active_transfers[chat_id] = transfer_ctx
 
-    result = await upload_with_rclone(file_path, filename, bot, chat_id, msg_id, transfer_ctx)
+    result = await upload_with_rclone(file_path, filename, bot, chat_id, msg_id, transfer_ctx, user_id)
 
     _active_transfers.pop(chat_id, None)
 

@@ -20,10 +20,9 @@ class FileEntry:
     full_path: str
 
 
-def list_workspace() -> list[FileEntry]:
-    """Return all top-level items in WORKSPACE_PATH, sorted by name."""
-    ws = config.WORKSPACE_PATH
-    os.makedirs(ws, exist_ok=True)
+def list_workspace(user_id: int) -> list[FileEntry]:
+    """Return all top-level items in user's workspace, sorted by name."""
+    ws = config.user_workspace(user_id)
     entries = []
     for idx, name in enumerate(sorted(os.listdir(ws)), start=1):
         full = os.path.join(ws, name)
@@ -49,17 +48,16 @@ def _get_size(path: str) -> float:
     return total
 
 
-def workspace_stats() -> tuple[float, float, float]:
+def workspace_stats(user_id: int) -> tuple[float, float, float]:
     """Returns (used_bytes, free_bytes, total_bytes)."""
-    ws = config.WORKSPACE_PATH
-    os.makedirs(ws, exist_ok=True)
+    ws = config.user_workspace(user_id)
     stat = shutil.disk_usage(ws)
-    used_by_files = sum(e.size_bytes for e in list_workspace())
+    used_by_files = sum(e.size_bytes for e in list_workspace(user_id))
     return used_by_files, float(stat.free), float(stat.total)
 
 
-def format_workspace_listing(entries: list[FileEntry]) -> str:
-    used, free, _ = workspace_stats()
+def format_workspace_listing(entries: list[FileEntry], user_id: int) -> str:
+    used, free, _ = workspace_stats(user_id)
     if not entries:
         lines = ["📂 <b>Workspace is empty.</b>", f"\n💾 Free: {format_size(free)}"]
         return "\n".join(lines)
@@ -71,9 +69,9 @@ def format_workspace_listing(entries: list[FileEntry]) -> str:
     return "\n".join(lines)
 
 
-def delete_by_index(index: int) -> tuple[bool, str]:
+def delete_by_index(index: int, user_id: int) -> tuple[bool, str]:
     """Delete workspace item by 1-based index. Returns (success, message)."""
-    entries = list_workspace()
+    entries = list_workspace(user_id)
     if index < 1 or index > len(entries):
         return False, f"❌ Invalid number. Choose between 1 and {len(entries)}."
     entry = entries[index - 1]
@@ -88,9 +86,9 @@ def delete_by_index(index: int) -> tuple[bool, str]:
         return False, f"❌ Error deleting file: {e}"
 
 
-def clear_workspace() -> tuple[bool, str]:
-    """Delete all items in workspace. Returns (success, message)."""
-    entries = list_workspace()
+def clear_workspace(user_id: int) -> tuple[bool, str]:
+    """Delete all items in user's workspace. Returns (success, message)."""
+    entries = list_workspace(user_id)
     if not entries:
         return True, "ℹ️ Workspace is already empty."
     errors = []
@@ -104,16 +102,15 @@ def clear_workspace() -> tuple[bool, str]:
             errors.append(str(e))
     if errors:
         return False, f"⚠️ Some files could not be deleted:\n" + "\n".join(errors)
-    logger.info("Workspace cleared.")
+    logger.info(f"Workspace cleared for user {user_id}.")
     return True, "✅ <b>Workspace cleared successfully!</b>"
 
 
-def has_enough_space(required_bytes: float) -> bool:
-    """Check if workspace has at least required_bytes free."""
-    _, free, _ = workspace_stats()
+def has_enough_space(required_bytes: float, user_id: int) -> bool:
+    _, free, _ = workspace_stats(user_id)
     return free >= required_bytes
 
 
-def get_workspace_free_bytes() -> float:
-    _, free, _ = workspace_stats()
+def get_workspace_free_bytes(user_id: int) -> float:
+    _, free, _ = workspace_stats(user_id)
     return free

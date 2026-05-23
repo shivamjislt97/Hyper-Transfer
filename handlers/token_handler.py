@@ -48,8 +48,9 @@ async def handle_token_input(message: Message, state: FSMContext) -> None:
         await message.answer("❌ Empty input. Please paste the JSON token.", parse_mode="HTML")
         return
 
+    user_id = message.from_user.id
     status_msg = await message.answer("⏳ Validating token...", parse_mode="HTML")
-    success, msg = apply_token(raw)
+    success, msg = apply_token(raw, user_id)
 
     from handlers.start_handler import main_menu_keyboard
     await status_msg.edit_text(

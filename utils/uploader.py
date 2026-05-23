@@ -26,29 +26,31 @@ async def upload_with_rclone(
     bot: Bot,
     chat_id: int,
     msg_id: int,
-    transfer_ctx: dict,  # required — carries stop_event, proc, cancel_keyboard, log_path
+    transfer_ctx: dict,
+    user_id: int,
 ) -> UploadResult:
     """
-    Upload file to GDrive using rclone.
-    Progress via asyncio.gather(subprocess, monitor_upload).
+    Upload file to GDrive using rclone with per-user config.
     """
     if not os.path.exists(local_path):
         return UploadResult(False, error=f"Local path not found: {local_path}")
 
-    remote_dest = f"{config.RCLONE_REMOTE_NAME}:{config.GDRIVE_FOLDER}"
-    gdrive_path = f"/My Drive/{config.GDRIVE_FOLDER}/{filename}"
-    log_file    = local_path + ".rclone.log"
-    stop_event  = transfer_ctx["stop_event"]
+    rclone_config = config.user_rclone_config(user_id)
+    remote_name   = config.user_rclone_remote(user_id)
+    remote_dest   = f"{remote_name}:{config.GDRIVE_FOLDER}"
+    gdrive_path   = f"/My Drive/{config.GDRIVE_FOLDER}/{filename}"
+    log_file      = local_path + ".rclone.log"
+    stop_event    = transfer_ctx["stop_event"]
 
-    transfer_ctx["log_path"]      = log_file        # expose for cancel cleanup
-    transfer_ctx["remote_path"]   = f"{config.RCLONE_REMOTE_NAME}:{config.GDRIVE_FOLDER}/{filename}"
-    transfer_ctx["phase"]         = "upload"
+    transfer_ctx["log_path"]    = log_file
+    transfer_ctx["remote_path"] = f"{remote_name}:{config.GDRIVE_FOLDER}/{filename}"
+    transfer_ctx["phase"]       = "upload"
 
-    logger.info(f"Uploading '{local_path}' → {remote_dest}")
+    logger.info(f"Uploading '{local_path}' → {remote_dest} (user {user_id})")
 
     cmd = [
         "rclone", "copy",
-        "--config", config.RCLONE_CONFIG_PATH,
+        "--config", rclone_config,
         "--log-file", log_file,
         "--log-level", "INFO",
         "--stats", "3s",

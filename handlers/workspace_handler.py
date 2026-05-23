@@ -1,6 +1,5 @@
 """
-Flow C — Workspace Manager.
-List, delete specific, or clear all files in the download workspace.
+Flow C — Workspace Manager (per-user isolated workspace).
 """
 from aiogram import Router
 from aiogram.fsm.context import FSMContext
@@ -35,26 +34,19 @@ def workspace_action_keyboard(entries, has_files: bool) -> InlineKeyboardMarkup:
 
 def confirm_clear_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ Yes, Clear All", callback_data="ws:clear_do"),
-                InlineKeyboardButton(text="❌ Cancel", callback_data="menu:workspace"),
-            ]
-        ]
-    )
-
-
-def back_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🔙 Back to Menu", callback_data="menu:back")]]
+        inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Yes, Clear All", callback_data="ws:clear_do"),
+            InlineKeyboardButton(text="❌ Cancel",         callback_data="menu:workspace"),
+        ]]
     )
 
 
 @router.callback_query(lambda c: c.data == "menu:workspace")
 async def cb_workspace_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    entries = [e for e in list_workspace() if not e.name.endswith(".rclone.log")]
-    text = format_workspace_listing(entries)
+    uid = callback.from_user.id
+    entries = [e for e in list_workspace(uid) if not e.name.endswith(".rclone.log")]
+    text = format_workspace_listing(entries, uid)
     await callback.message.edit_text(
         text, reply_markup=workspace_action_keyboard(entries, bool(entries)), parse_mode="HTML"
     )
@@ -63,10 +55,11 @@ async def cb_workspace_menu(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(lambda c: c.data and c.data.startswith("ws:del:"))
 async def cb_ws_delete_file(callback: CallbackQuery) -> None:
+    uid = callback.from_user.id
     index = int(callback.data.split(":")[-1])
-    success, msg = delete_by_index(index)
-    entries = [e for e in list_workspace() if not e.name.endswith(".rclone.log")]
-    text = format_workspace_listing(entries)
+    success, msg = delete_by_index(index, uid)
+    entries = [e for e in list_workspace(uid) if not e.name.endswith(".rclone.log")]
+    text = format_workspace_listing(entries, uid)
     await callback.message.edit_text(
         msg + "\n\n" + text,
         reply_markup=workspace_action_keyboard(entries, bool(entries)),
@@ -78,7 +71,7 @@ async def cb_ws_delete_file(callback: CallbackQuery) -> None:
 @router.callback_query(lambda c: c.data == "ws:clear_confirm")
 async def cb_clear_confirm(callback: CallbackQuery) -> None:
     await callback.message.edit_text(
-        "⚠️ <b>Are you sure?</b>\n\nThis will delete <b>ALL files</b> in the workspace!",
+        "⚠️ <b>Are you sure?</b>\n\nThis will delete <b>ALL your files</b> in the workspace!",
         reply_markup=confirm_clear_keyboard(),
         parse_mode="HTML",
     )
@@ -87,8 +80,9 @@ async def cb_clear_confirm(callback: CallbackQuery) -> None:
 
 @router.callback_query(lambda c: c.data == "ws:clear_do")
 async def cb_clear_do(callback: CallbackQuery) -> None:
+    uid = callback.from_user.id
     await callback.message.edit_text("⏳ Clearing workspace...", parse_mode="HTML")
-    success, msg = clear_workspace()
+    success, msg = clear_workspace(uid)
 
     from handlers.start_handler import main_menu_keyboard
     await callback.message.edit_text(

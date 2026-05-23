@@ -1,0 +1,24 @@
+services:
+  bot:
+    build: .
+    image: hyper-transfer:latest
+    container_name: hyper-transfer-bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - bot_data:/app/data          # rclone.conf, token.json, bot.log
+      - downloads:/app/downloads    # active download workspace
+      - ./logs:/app/logs            # host-mounted log dir
+    # MegaBasterd JAR (optional — mount if you have it)
+    # - /opt/megabasterd:/opt/megabasterd:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bot_data:
+    name: hyper-transfer-data
+  downloads:
+    name: hyper-transfer-downloads

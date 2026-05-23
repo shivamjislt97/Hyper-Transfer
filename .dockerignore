@@ -1,0 +1,15 @@
+.env
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+data/bot.log
+data/token.json
+data/rclone.conf
+downloads/
+logs/
+docker-backup/
+README.md
+*.md
+.deps_installed

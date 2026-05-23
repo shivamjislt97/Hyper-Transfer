@@ -1,0 +1,13 @@
+.env
+data/token.json
+data/rclone.conf
+data/session.json
+data/bot.log
+data/startup.log
+data/bot.pid
+__pycache__/
+*.pyc
+*.pyo
+.deps_installed
+venv/
+downloads/
